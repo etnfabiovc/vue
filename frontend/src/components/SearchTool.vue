@@ -1,15 +1,39 @@
 <script setup lang="ts">
-import { useMagicKeys } from '@vueuse/core'
-
-import { ref, watch } from 'vue'
+import { useMagicKeys } from "@vueuse/core"
+import { ref, watch } from "vue"
 
 const open = ref(false)
 
 const keys = useMagicKeys()
-const CmdJ = keys['Cmd+J']
 
-function handleOpenChange() {
+const handleOpenChange = () => {
   open.value = !open.value
+}
+
+const ctrlP = keys["Ctrl+P"]
+const metaP = keys["Meta+P"]
+const escapeKey = keys["Escape"]
+
+const triggerCombos = [ctrlP, metaP].filter(
+  (combo): combo is Exclude<typeof ctrlP, undefined> => combo !== undefined,
+)
+
+if (triggerCombos.length) {
+  triggerCombos.forEach((combo) => {
+    watch(combo, (isPressed) => {
+      if (isPressed) {
+        open.value = true
+      }
+    })
+  })
+}
+
+if (escapeKey) {
+  watch(escapeKey, (isPressed) => {
+    if (isPressed) {
+      open.value = false
+    }
+  })
 }
 </script>
 
