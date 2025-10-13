@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import etnLogo from "../assets/images/etn_logo2.png"
-import { ref } from "vue"
 import { useSidebar } from "@/components/ui/sidebar/utils"
 
 import {
@@ -13,6 +12,10 @@ import {
   ChevronUp,
   Gauge,
   File,
+  Flame,
+  ClipboardCheck,
+  Files,
+  AlertTriangle,
 } from "lucide-vue-next"
 
 import {
@@ -36,7 +39,13 @@ import {
 
 import SidebarHeader from "./ui/sidebar/SidebarHeader.vue"
 
-const { state, expand } = useSidebar() // ✅ Aqui está o segredo
+const { state, setOpen } = useSidebar()
+
+const ensureExpanded = () => {
+  if (state.value === "collapsed") {
+    setOpen(true)
+  }
+}
 
 const infoMenu = [
   { id: "about", title: "Sobre a Aplicação", url: "/about", icon: Info },
@@ -45,10 +54,30 @@ const infoMenu = [
 ]
 
 const requestList = [
-  { id: "reqperi", title: "Adicional de Periculosidade", url: "/reqperi" },
-  { id: "pendencias", title: "Gestão de Pendências", url: "/pendencias" },
-  { id: "documentos", title: "Documentos de Segurança", url: "/documentos" },
-  { id: "acidentes", title: "Acidentes e Incidentes de Trabalho", url: "/acidentes" },
+  {
+    id: "reqperi",
+    title: "Adicional de Periculosidade",
+    url: "/reqperi",
+    icon: Flame,
+  },
+  {
+    id: "pendencias",
+    title: "Gestão de Pendências",
+    url: "/pendencias",
+    icon: ClipboardCheck,
+  },
+  {
+    id: "documentos",
+    title: "Documentos de Segurança",
+    url: "/documentos",
+    icon: Files,
+  },
+  {
+    id: "acidentes",
+    title: "Acidentes e Incidentes de Trabalho",
+    url: "/acidentes",
+    icon: AlertTriangle,
+  },
 ]
 
 const managerList = [
@@ -57,8 +86,6 @@ const managerList = [
   { id: "followup", title: "Gerir Solicitações", url: "/followup", icon: SquareKanban },
 ]
 
-const serviceIsOpen = ref(false)
-const toggleServiceMenu = () => (serviceIsOpen.value = !serviceIsOpen.value)
 </script>
 
 <template>
@@ -74,37 +101,34 @@ const toggleServiceMenu = () => (serviceIsOpen.value = !serviceIsOpen.value)
       <SidebarGroup>
         <SidebarGroupLabel>Atendimento</SidebarGroupLabel>
         <Collapsible defaultOpen class="group/collapsible">
-          <SidebarMenuItem>
-            <CollapsibleTrigger asChild>
-              <SidebarMenuButton >
-                <!-- 👇 ao clicar, força a expansão -->
-                <component :is="ClipboardList" @click="expand"/>
-                Serviços
-                <ChevronDown
-                  v-if="!serviceIsOpen"
-                  class="ml-auto"
-                  @click.stop="toggleServiceMenu"
-                />
-                <ChevronUp
-                  v-if="serviceIsOpen"
-                  class="ml-auto"
-                  @click.stop="toggleServiceMenu"
-                />
-              </SidebarMenuButton>
-            </CollapsibleTrigger>
+          <template #default="{ open }">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton @click="ensureExpanded">
+                  <component :is="ClipboardList" class="h-4 w-4" />
+                  <span>Serviços</span>
+                  <ChevronUp v-if="open" class="ml-auto h-4 w-4" />
+                  <ChevronDown v-else class="ml-auto h-4 w-4" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
 
-            <CollapsibleContent>
-              <SidebarMenuSub>
-                <SidebarMenuSubItem v-for="item in requestList" :key="item.id">
-                  <SidebarMenuButton asChild @click="expand">
-                    <RouterLink :to="item.url" class="sub-item">
-                      <span>{{ item.title }}</span>
-                    </RouterLink>
-                  </SidebarMenuButton>
-                </SidebarMenuSubItem>
-              </SidebarMenuSub>
-            </CollapsibleContent>
-          </SidebarMenuItem>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  <SidebarMenuSubItem v-for="item in requestList" :key="item.id">
+                    <SidebarMenuButton asChild @click="ensureExpanded">
+                      <RouterLink
+                        :to="item.url"
+                        class="flex w-full items-center gap-2 whitespace-normal"
+                      >
+                        <component :is="item.icon" class="h-4 w-4" />
+                        <span>{{ item.title }}</span>
+                      </RouterLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </template>
         </Collapsible>
       </SidebarGroup>
 
@@ -114,9 +138,9 @@ const toggleServiceMenu = () => (serviceIsOpen.value = !serviceIsOpen.value)
         <SidebarGroupContent>
           <SidebarMenu>
             <SidebarMenuItem v-for="item in managerList" :key="item.id">
-              <SidebarMenuButton asChild @click="expand">
+              <SidebarMenuButton asChild @click="ensureExpanded">
                 <RouterLink :to="item.url">
-                  <component :is="item.icon" @click="expand"/>
+                  <component :is="item.icon" class="h-4 w-4" />
                   <span>{{ item.title }}</span>
                 </RouterLink>
               </SidebarMenuButton>
@@ -131,9 +155,9 @@ const toggleServiceMenu = () => (serviceIsOpen.value = !serviceIsOpen.value)
         <SidebarGroupContent>
           <SidebarMenu>
             <SidebarMenuItem v-for="item in infoMenu" :key="item.id">
-              <SidebarMenuButton asChild @click="expand">
+              <SidebarMenuButton asChild @click="ensureExpanded">
                 <RouterLink :to="item.url">
-                  <component :is="item.icon" />
+                  <component :is="item.icon" class="h-4 w-4" />
                   <span>{{ item.title }}</span>
                 </RouterLink>
               </SidebarMenuButton>
@@ -152,11 +176,5 @@ const toggleServiceMenu = () => (serviceIsOpen.value = !serviceIsOpen.value)
 }
 .etn-logo:hover {
   cursor: pointer;
-}
-.sub-item {
-  display: block;
-  width: 100%;
-  white-space: normal;
-  word-wrap: break-word;
 }
 </style>
