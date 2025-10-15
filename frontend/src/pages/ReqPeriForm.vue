@@ -32,6 +32,8 @@ interface ApiUser {
   nome: string
   funcao?: string | null
   email?: string | null
+  uo_codigo?: string | null
+  uo_descricao?: string | null
 }
 
 interface RiskOption {
@@ -62,6 +64,32 @@ const dimLocal = ref<SelectOption[]>([])
 const dimUO = ref<SelectOption[]>([])
 const riscosBase = ref<GroupedRisks>({})
 const riskDescriptions = ref<Record<number, string>>({})
+const optionLabelOverrides: Record<string, string> = {
+  angra_1: 'Angra 1',
+  angra_2: 'Angra 2',
+  angra_3: 'Angra 3',
+  inicial: 'Inicial',
+  mudanca_funcao: 'Mudança de Função',
+  mudanca_unidade: 'Mudança de Unidade',
+  mudanca_setor: 'Mudança de Setor',
+  lma: 'LMA',
+  uas: 'UAS',
+  pmg_ou_cgr: 'PMG ou CGR',
+}
+
+function formatOptionLabel(value: string): string {
+  const raw = (value ?? '').trim()
+  if (!raw) return ''
+
+  const normalized = raw.toLowerCase()
+  const override = optionLabelOverrides[normalized]
+  if (override) return override
+
+  return normalized
+    .split(/[_\s]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
 
 function createEmptyRiskSelection(): Record<string, number[]> {
   return {
@@ -133,17 +161,17 @@ onMounted(async () => {
 
     dimLocal.value = locaisRes.data.map((local: { codigo: string; descricao: string }) => ({
       value: local.codigo,
-      label: local.descricao,
+      label: formatOptionLabel(local.descricao),
     }))
 
     dimTipo.value = tiposRes.data.map((tipo: { codigo: string; descricao: string }) => ({
       value: tipo.codigo,
-      label: tipo.descricao,
+      label: formatOptionLabel(tipo.descricao),
     }))
 
     dimRegime.value = regimesRes.data.map((regime: { codigo: string; descricao: string }) => ({
       value: regime.codigo,
-      label: regime.descricao,
+      label: formatOptionLabel(regime.descricao),
     }))
 
     dimUO.value = uosRes.data.map((uo: { codigo: string; descricao: string }) => ({
@@ -179,6 +207,7 @@ watch(
     if (!novaMatricula) {
       setFieldValue('nome', '')
       setFieldValue('cargo', '')
+      setFieldValue('orgao', '')
       return
     }
 
@@ -199,6 +228,7 @@ watch(
 
     setFieldValue('nome', userData?.nome ?? '')
     setFieldValue('cargo', userData?.funcao ?? '')
+    setFieldValue('orgao', userData?.uo_codigo ?? '')
   }
 )
 

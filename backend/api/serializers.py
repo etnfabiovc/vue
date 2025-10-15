@@ -18,9 +18,12 @@ from .models import (
 
 
 class DimUserSerializer(serializers.ModelSerializer):
+    uo_codigo = serializers.CharField(source="uo.codigo", read_only=True)
+    uo_descricao = serializers.CharField(source="uo.descricao", read_only=True)
+
     class Meta:
         model = DimUser
-        fields = ["matricula", "nome", "email", "funcao"]
+        fields = ["matricula", "nome", "email", "funcao", "uo_codigo", "uo_descricao"]
 
 
 class DimUOSerializer(serializers.ModelSerializer):

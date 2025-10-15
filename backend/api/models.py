@@ -11,6 +11,13 @@ class DimUser(models.Model):
     nome = models.CharField(max_length=100)
     email = models.EmailField(blank=True, null=True)
     funcao = models.CharField(max_length=100, blank=True, null=True)
+    uo = models.ForeignKey(
+        "DimUO",
+        on_delete=models.PROTECT,
+        related_name="usuarios",
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         db_table = "dim_user"
