@@ -6,226 +6,336 @@ import * as z from 'zod'
 import { api } from '@/api'
 
 import {
-  Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+  FormDescription,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Checkbox } from '@/components/ui/checkbox'
-import DatePicker from "@/components/DatePicker.vue"
+import DatePicker from '@/components/DatePicker.vue'
 import DropdownMenu from '@/components/DropdownMenu.vue'
+import { Check } from 'lucide-vue-next'
 
-// === Bases ===
-const dimUser = ref<Record<string, any>>({})
-const dimTipo = ref<{ value: string; label: string }[]>([])
-const dimRegime = ref<{ value: string; label: string }[]>([])
-const dimLocal = ref<{ value: string; label: string }[]>([])
-const riscosBase = ref<Record<string, Record<string, string[]>>>({})
+type RiskType = 'INFLAMAVEL' | 'ELETRICIDADE' | 'RADIACAO'
 
-// === Carrega dados das dimensões ===
-onMounted(async () => {
-  try {
-    const [users, locais, tipos, regimes, risks] = await Promise.all([
-      api.get('usuarios/'),
-      api.get('locais/'),
-      api.get('tipos/'),
-      api.get('regimes/'),
-      api.get('risks/grouped/')
-    ])
+interface SelectOption {
+  value: string
+  label: string
+}
 
-    // Usuarios
-    dimUser.value = Object.fromEntries(users.data.map((u: any) => [u.matricula, u]))
+interface ApiUser {
+  matricula: string
+  nome: string
+  funcao?: string | null
+  email?: string | null
+}
 
-    // Locais
-    dimLocal.value = locais.data.map((l: any) => ({
-      value: l.codigo, label: l.descricao
-    }))
+interface RiskOption {
+  id: number
+  descricao: string
+}
 
-    // Tipos
-    dimTipo.value = tipos.data.map((t: any) => ({
-      value: t.codigo, label: t.descricao
-    }))
+type GroupedRisks = Record<string, Record<string, RiskOption[]>>
 
-    // Regimes
-    dimRegime.value = regimes.data.map((r: any) => ({
-      value: r.codigo, label: r.descricao
-    }))
+interface FormValues {
+  matricula: string
+  nome: string
+  cargo: string
+  orgao: string
+  localAtividade: string
+  regimeTrabalho: string
+  tipoRequerimento: string
+  dataInicio: Date | undefined
+  dataTermino: Date | null
+  tipoRisco: RiskType | undefined
+  selecaoRiscos: number[]
+}
 
-    // Riscos (agrupado por código)
-    riscosBase.value = Object.fromEntries(
-      Object.entries(risks.data).map(([codigo, grupos]: any) => [codigo.toLowerCase(), grupos])
-    )
+const dimUser = ref<Record<string, ApiUser>>({})
+const dimTipo = ref<SelectOption[]>([])
+const dimRegime = ref<SelectOption[]>([])
+const dimLocal = ref<SelectOption[]>([])
+const dimUO = ref<SelectOption[]>([])
+const riscosBase = ref<GroupedRisks>({})
+const riskDescriptions = ref<Record<number, string>>({})
 
-    console.log('✅ Dimensões carregadas')
-  } catch (err) {
-    console.error('❌ Erro ao carregar dimensões:', err)
+function createEmptyRiskSelection(): Record<string, number[]> {
+  return {
+    inflamavel: [],
+    eletricidade: [],
+    radiacao: [],
   }
-})
+}
 
-// === Estados ===
-const riscosSelecionados = ref<Record<string, string[]>>({
-  inflamavel: [],
-  eletricidade: [],
-  radiacao: [],
-})
+const riscosSelecionados = ref<Record<string, number[]>>(createEmptyRiskSelection())
 
-// === Schema ===
 const formSchema = toTypedSchema(
   z.object({
-    matricula: z.string().min(1, 'Matrícula é obrigatória.'),
+    matricula: z.string().min(1, 'Informe a matricula.'),
     nome: z.string().optional(),
     cargo: z.string().optional(),
-    orgao: z.string().optional(),
-    localAtividade: z.string().optional(),
-    regimeTrabalho: z.string().optional(),
-    tipoRequerimento: z.string().optional(),
-    dataInicio: z.date({ required_error: 'Data de início é obrigatória.' }),
+    orgao: z.string().min(1, 'Selecione a unidade.'),
+    localAtividade: z.string().min(1, 'Selecione o local de atividade.'),
+    regimeTrabalho: z.string().min(1, 'Selecione o regime de trabalho.'),
+    tipoRequerimento: z.string().min(1, 'Selecione o tipo de requerimento.'),
+    dataInicio: z.date({ required_error: 'Informe a data de inicio.' }),
     dataTermino: z.date().optional().nullable(),
     tipoRisco: z.enum(['INFLAMAVEL', 'ELETRICIDADE', 'RADIACAO'], {
       required_error: 'Selecione o tipo de risco.',
     }),
-    selecaoRiscos: z.array(z.string()).default([]).refine((val) => val.length > 0, {
-      message: 'Selecione pelo menos um risco detalhado.',
+    selecaoRiscos: z.array(z.number()).default([]).refine((val) => val.length > 0, {
+      message: 'Selecione ao menos um risco detalhado.',
     }),
   })
 )
 
-const { handleSubmit, values, setFieldValue } = useForm({
-  validationSchema: formSchema,
-  initialValues: { dataTermino: null, selecaoRiscos: [] },
-})
-
-// === Watch matrícula (busca automática) ===
-watch(() => values.matricula, async (novaMatricula) => {
-  if (!novaMatricula) return
-  let userData = dimUser.value[novaMatricula]
-
-  if (!userData) {
-    try {
-      const res = await api.get(`usuarios/?search=${novaMatricula}`)
-      if (res.data.length > 0) {
-        userData = res.data[0]
-        dimUser.value[novaMatricula] = userData
-      }
-    } catch (err) {
-      console.error('Erro ao buscar usuário:', err)
-    }
-  }
-
-  if (userData) {
-    setFieldValue('nome', userData.nome)
-    setFieldValue('cargo', userData.funcao)
-    setFieldValue('orgao', userData.uo)
-  } else {
-    setFieldValue('nome', '')
-    setFieldValue('cargo', '')
-    setFieldValue('orgao', '')
-  }
-})
-
-// === Computed: riscos dinâmicos ===
-function normalize(str: string) {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+const initialFormValues: FormValues = {
+  matricula: '',
+  nome: '',
+  cargo: '',
+  orgao: '',
+  localAtividade: '',
+  regimeTrabalho: '',
+  tipoRequerimento: '',
+  dataInicio: undefined,
+  dataTermino: null,
+  tipoRisco: undefined,
+  selecaoRiscos: [],
 }
+
+const { handleSubmit, values, setFieldValue, resetForm } = useForm<FormValues>({
+  validationSchema: formSchema,
+  initialValues: { ...initialFormValues },
+})
+
+function normalize(value: string | null | undefined): string {
+  return (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+onMounted(async () => {
+  try {
+    const [usersRes, locaisRes, tiposRes, regimesRes, uosRes, riscosRes] = await Promise.all([
+      api.get('users/'),
+      api.get('locais/'),
+      api.get('tipos_req/'),
+      api.get('regimes/'),
+      api.get('uos/'),
+      api.get('riscos/'),
+    ])
+
+    dimUser.value = Object.fromEntries(
+      usersRes.data.map((user: ApiUser) => [user.matricula, user])
+    )
+
+    dimLocal.value = locaisRes.data.map((local: { codigo: string; descricao: string }) => ({
+      value: local.codigo,
+      label: local.descricao,
+    }))
+
+    dimTipo.value = tiposRes.data.map((tipo: { codigo: string; descricao: string }) => ({
+      value: tipo.codigo,
+      label: tipo.descricao,
+    }))
+
+    dimRegime.value = regimesRes.data.map((regime: { codigo: string; descricao: string }) => ({
+      value: regime.codigo,
+      label: regime.descricao,
+    }))
+
+    dimUO.value = uosRes.data.map((uo: { codigo: string; descricao: string }) => ({
+      value: uo.codigo,
+      label: uo.descricao,
+    }))
+
+    const grouped: GroupedRisks = {}
+    const lookup: Record<number, string> = {}
+
+    riscosRes.data.forEach(
+      (risk: { id: number; codigo: string; subcategoria: string; descricao: string }) => {
+        const key = normalize(risk.codigo)
+        const bucket = grouped[key] ?? (grouped[key] = {})
+        const list = bucket[risk.subcategoria] ?? (bucket[risk.subcategoria] = [])
+
+        const option: RiskOption = { id: risk.id, descricao: risk.descricao }
+        list.push(option)
+        lookup[risk.id] = risk.descricao
+      }
+    )
+
+    riscosBase.value = grouped
+    riskDescriptions.value = lookup
+  } catch (err) {
+    console.error('Erro ao carregar dados da API:', err)
+  }
+})
+
+watch(
+  () => values.matricula,
+  async (novaMatricula) => {
+    if (!novaMatricula) {
+      setFieldValue('nome', '')
+      setFieldValue('cargo', '')
+      return
+    }
+
+    let userData = dimUser.value[novaMatricula]
+
+    if (!userData) {
+      try {
+        const response = await api.get(`users/${novaMatricula}/`)
+        userData = response.data as ApiUser
+        if (userData) {
+          dimUser.value[novaMatricula] = userData
+        }
+      } catch (error) {
+        userData = undefined
+        console.warn(`Matricula ${novaMatricula} nao encontrada.`)
+      }
+    }
+
+    setFieldValue('nome', userData?.nome ?? '')
+    setFieldValue('cargo', userData?.funcao ?? '')
+  }
+)
 
 const riscosDisponiveis = computed(() => {
-  const tipo = values.tipoRisco ? normalize(values.tipoRisco) : ""
-  return riscosBase.value[tipo] || {}
+  const tipo = normalize(values.tipoRisco)
+  return riscosBase.value[tipo] ?? {}
 })
 
-// === Seleção de riscos ===
-function toggleSubcategoria(subcat: string, checked: boolean, handleChange: (v: string[]) => void) {
-  const tipo = normalize(values.tipoRisco || "")
+function toggleSubcategoria(
+  subcategoria: string,
+  checked: boolean,
+  handleChange: (value: number[]) => void
+) {
+  const tipo = normalize(values.tipoRisco)
   if (!tipo) return
 
-  const descricoes = riscosDisponiveis.value[subcat] || []
-  const atual = [...(riscosSelecionados.value[tipo] || [])]
+  const items = riscosDisponiveis.value[subcategoria] ?? []
+  const ids = items.map((item) => item.id)
+  const current = new Set(riscosSelecionados.value[tipo] ?? [])
 
-  const novos = checked
-    ? Array.from(new Set([...atual, ...descricoes]))
-    : atual.filter((v) => !descricoes.includes(v))
+  if (checked) {
+    ids.forEach((id) => current.add(id))
+  } else {
+    ids.forEach((id) => current.delete(id))
+  }
 
-  riscosSelecionados.value[tipo] = novos
-  handleChange(novos)
-  setFieldValue('selecaoRiscos', novos)
+  const updated = Array.from(current)
+  riscosSelecionados.value[tipo] = updated
+  handleChange(updated)
+  setFieldValue('selecaoRiscos', updated)
 }
 
-function toggleDescricao(desc: string, checked: boolean, handleChange: (v: string[]) => void) {
-  const tipo = normalize(values.tipoRisco || "")
+function toggleDescricao(
+  risk: RiskOption,
+  checked: boolean,
+  handleChange: (value: number[]) => void
+) {
+  const tipo = normalize(values.tipoRisco)
   if (!tipo) return
 
-  const atual = [...(riscosSelecionados.value[tipo] || [])]
-  const novos = checked
-    ? Array.from(new Set([...atual, desc]))
-    : atual.filter((v) => v !== desc)
+  const current = new Set(riscosSelecionados.value[tipo] ?? [])
 
-  riscosSelecionados.value[tipo] = novos
-  handleChange(novos)
-  setFieldValue('selecaoRiscos', novos)
+  if (checked) current.add(risk.id)
+  else current.delete(risk.id)
+
+  const updated = Array.from(current)
+  riscosSelecionados.value[tipo] = updated
+  handleChange(updated)
+  setFieldValue('selecaoRiscos', updated)
 }
 
-watch(() => values.tipoRisco, (novoTipo, antigoTipo) => {
-  if (antigoTipo)
-    riscosSelecionados.value[normalize(antigoTipo)] = [...values.selecaoRiscos]
-
-  const restaurar = riscosSelecionados.value[normalize(novoTipo || '')] || []
-  setFieldValue('selecaoRiscos', restaurar)
-})
-
-// === Submit ===
-const onSubmit = handleSubmit(async (values) => {
-  try {
-    const payload = {
-      status: 'Aberto',
-      reqMatricula: values.matricula,
-      funcMatricula: values.matricula,
-      uo: values.orgao,
-      regimeTrabalho: values.regimeTrabalho,
-      localAtividade: values.localAtividade,
-      tipoRequerimento: values.tipoRequerimento,
-      dataInicio: values.dataInicio,
-      dataFim: values.dataTermino || null,
-      atividadesExecutadas: values.selecaoRiscos.join('; '),
-      docUuid: crypto.randomUUID(),
+watch(
+  () => values.tipoRisco,
+  (novoTipo, antigoTipo) => {
+    if (antigoTipo) {
+      const previousKey = normalize(antigoTipo)
+      riscosSelecionados.value[previousKey] = [...values.selecaoRiscos]
     }
 
-    const res = await api.post('requerimentos/', payload)
-    console.log('✅ Requerimento enviado:', res.data)
+    if (!novoTipo) {
+      setFieldValue('selecaoRiscos', [])
+      return
+    }
+
+    const key = normalize(novoTipo)
+    const stored = riscosSelecionados.value[key] ?? []
+    setFieldValue('selecaoRiscos', [...stored])
+  }
+)
+
+function formatDate(value: Date | null | undefined): string | null {
+  if (!value) return null
+  const year = value.getFullYear()
+  const month = `${value.getMonth() + 1}`.padStart(2, '0')
+  const day = `${value.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const onSubmit = handleSubmit(async (formValues) => {
+  try {
+    const descriptions = formValues.selecaoRiscos
+      .map((id) => riskDescriptions.value[id])
+      .filter(Boolean)
+      .join('; ')
+
+    const payload = {
+      status: 'Aberto',
+      data_inicio: formatDate(formValues.dataInicio),
+      data_fim: formatDate(formValues.dataTermino),
+      atividades_executadas: descriptions,
+      doc_uuid: crypto.randomUUID(),
+      requerente_matricula: formValues.matricula,
+      funcionario_matricula: formValues.matricula,
+      uo_codigo: formValues.orgao,
+      regime_trabalho_codigo: formValues.regimeTrabalho,
+      local_atividade_codigo: formValues.localAtividade,
+      tipo_requerimento_codigo: formValues.tipoRequerimento,
+      riscos_ids: formValues.selecaoRiscos,
+    }
+
+    await api.post('requerimentos/', payload)
     alert('Requerimento enviado com sucesso!')
+
+    resetForm({ values: { ...initialFormValues } })
+    riscosSelecionados.value = createEmptyRiskSelection()
   } catch (err) {
-    console.error('❌ Erro ao enviar requerimento:', err)
-    alert('Erro ao enviar o requerimento.')
+    console.error('Erro ao enviar requerimento:', err)
+    alert('Nao foi possivel enviar o requerimento.')
   }
 })
 </script>
 
-
-
 <template>
-  <div class="flex flex-col h-full overflow-hidden p-4 bg-[linear-gradient(rgba(255,255,255,0.7),rgba(255,255,255,0.7))] rounded-md">
+  <div
+    class="flex flex-col h-full overflow-hidden p-4 bg-[linear-gradient(rgba(255,255,255,0.7),rgba(255,255,255,0.7))] rounded-md"
+  >
     <h1 class="text-2xl font-bold mb-4 flex-shrink-0 sticky top-0 bg-transparent z-10">
-      Formulário de Solicitação de Adicional de Periculosidade
+      Formulario de Solicitacao de Adicional de Periculosidade
     </h1>
 
     <div class="flex-grow overflow-y-auto pr-2">
-      <form @submit="onSubmit" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <!-- COLUNA ESQUERDA -->
+      <form @submit.prevent="onSubmit" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div class="flex flex-col space-y-4 lg:col-span-1">
-          <!-- Seção 1 -->
           <section class="space-y-4 p-4 rounded-lg shadow-sm bg-white border border-gray-200">
-            <h2 class="text-lg font-semibold mb-2">Informações Pessoais</h2>
+            <h2 class="text-lg font-semibold mb-2">Informacoes Pessoais</h2>
 
             <FormField name="matricula" v-slot="{ componentField }">
               <FormItem>
-                <FormLabel>Matrícula</FormLabel>
+                <FormLabel>Matricula</FormLabel>
                 <FormControl>
-                  <Input type="text" maxlength="6" minlength="6" placeholder="Ex: 123456" v-bind="componentField" />
+                  <Input type="text" maxlength="20" placeholder="Ex: 123456" v-bind="componentField" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             </FormField>
 
-            <FormField name="nome" v-slot="{ componentField }">
+            <FormField name="nome" v-slot="{ }">
               <FormItem>
                 <FormLabel>Nome</FormLabel>
                 <FormControl>
@@ -234,214 +344,227 @@ const onSubmit = handleSubmit(async (values) => {
               </FormItem>
             </FormField>
 
-            <FormField name="cargo" v-slot="{ componentField }">
+            <FormField name="cargo" v-slot="{ }">
               <FormItem>
-                <FormLabel>Cargo / Função</FormLabel>
+                <FormLabel>Cargo ou Funcao</FormLabel>
                 <FormControl>
                   <Input type="text" :model-value="values.cargo" disabled />
                 </FormControl>
               </FormItem>
             </FormField>
 
-            <FormField name="orgao" v-slot="{ componentField }">
+            <FormField name="orgao" v-slot="{ value, handleChange }">
               <FormItem>
-                <FormLabel>Órgão de Lotação</FormLabel>
+                <FormLabel>Unidade Organizacional</FormLabel>
                 <FormControl>
-                  <Input type="text" :model-value="values.orgao" disabled />
+                  <DropdownMenu
+                    :model-value="value"
+                    @update:model-value="handleChange"
+                    :items="dimUO"
+                    placeholder="Selecione a unidade"
+                  />
                 </FormControl>
+                <FormMessage />
               </FormItem>
             </FormField>
           </section>
 
-          <!-- Seção 2 -->
           <section class="space-y-4 p-4 rounded-lg shadow-sm bg-white border border-gray-200">
-            <h2 class="text-lg font-semibold mb-2">Informações Gerais da Atividade</h2>
+            <h2 class="text-lg font-semibold mb-2">Informacoes da Atividade</h2>
 
             <FormField name="localAtividade" v-slot="{ value, handleChange }">
-            <FormItem>
+              <FormItem>
                 <FormLabel>Local de Atividade</FormLabel>
                 <FormControl>
-                <DropdownMenu
-                    multiple
+                  <DropdownMenu
                     :model-value="value"
                     @update:model-value="handleChange"
                     :items="dimLocal"
-                    placeholder="Selecione o(s) local(is)"
-                />
+                    placeholder="Selecione o local"
+                  />
                 </FormControl>
                 <FormMessage />
-            </FormItem>
+              </FormItem>
             </FormField>
 
-            <FormField name="regimeTrabalho" v-slot="{ componentField }">
-            <FormItem>
+            <FormField name="regimeTrabalho" v-slot="{ value, handleChange }">
+              <FormItem>
                 <FormLabel>Regime de Trabalho</FormLabel>
                 <FormControl>
-                <DropdownMenu
-                    v-bind="componentField"
-                    :items="[
-                    { value: 'adm', label: 'Horário Administrativo' },
-                    { value: 'turno', label: 'Turno' },
-                    ]"
-                />
+                  <DropdownMenu
+                    :model-value="value"
+                    @update:model-value="handleChange"
+                    :items="dimRegime"
+                    placeholder="Selecione o regime"
+                  />
                 </FormControl>
                 <FormMessage />
-            </FormItem>
+              </FormItem>
             </FormField>
 
-            <FormField name="tipoRequerimento" v-slot="{ componentField }">
-            <FormItem>
+            <FormField name="tipoRequerimento" v-slot="{ value, handleChange }">
+              <FormItem>
                 <FormLabel>Tipo de Requerimento</FormLabel>
                 <FormControl>
-                <DropdownMenu
-                    v-bind="componentField"
+                  <DropdownMenu
+                    :model-value="value"
+                    @update:model-value="handleChange"
                     :items="dimTipo"
-                />
+                    placeholder="Selecione o tipo"
+                  />
                 </FormControl>
                 <FormMessage />
-            </FormItem>
+              </FormItem>
             </FormField>
-
           </section>
         </div>
 
-        <!-- COLUNA DIREITA -->
         <div class="flex flex-col space-y-4 lg:col-span-2">
           <section class="space-y-4 p-4 rounded-lg shadow-sm bg-white border border-gray-200 flex flex-col flex-grow">
             <h2 class="text-lg font-semibold mb-2">Detalhamento das Atividades</h2>
 
             <div class="space-y-4 overflow-y-auto pr-2 flex-grow">
-                <FormField name="dataInicio" v-slot="{ value, handleChange }">
+              <FormField name="dataInicio" v-slot="{ value, handleChange }">
                 <FormItem>
-                    <FormLabel>Data de Início / Mudança</FormLabel>
-                    <FormControl>
+                  <FormLabel>Data de Inicio</FormLabel>
+                  <FormControl>
                     <DatePicker
-                        :model-value="value instanceof Date ? value : value ? new Date(value + 'T00:00:00') : undefined"
-                        @update:model-value="(v) => handleChange(v instanceof Date ? v : v ? new Date(v + 'T00:00:00') : undefined)"
+                      :model-value="value instanceof Date ? value : value ? new Date(value) : undefined"
+                      @update:model-value="(v) => handleChange(v instanceof Date ? v : v ? new Date(v) : undefined)"
                     />
-                    </FormControl>
-                    <FormMessage />
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
-                </FormField>
+              </FormField>
 
-                <FormField name="dataTermino" v-slot="{ value, handleChange }">
+              <FormField name="dataTermino" v-slot="{ value, handleChange }">
                 <FormItem>
-                    <FormLabel>Data de Término (Opcional)</FormLabel>
-                    <FormControl>
+                  <FormLabel>Data de Termino (opcional)</FormLabel>
+                  <FormControl>
                     <DatePicker
-                        :model-value="value instanceof Date ? value : value ? new Date(value + 'T00:00:00') : undefined"
-                        @update:model-value="(v) => handleChange(v instanceof Date ? v : v ? new Date(v + 'T00:00:00') : undefined)"
+                      :model-value="value instanceof Date ? value : value ? new Date(value) : undefined"
+                      @update:model-value="(v) =>
+                        handleChange(v instanceof Date ? v : v ? new Date(v) : null)"
                     />
-                    </FormControl>
-                    <FormMessage />
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
-                </FormField>
+              </FormField>
 
               <FormField name="tipoRisco" v-slot="{ componentField }">
                 <FormItem class="space-y-3">
                   <FormLabel>Tipo de Risco</FormLabel>
                   <FormControl>
-                    <div class="flex flex-col space-y-1">
-                      <RadioGroup v-bind="componentField">
-                        <FormItem class="flex items-center space-x-3 space-y-0">
-                          <FormControl><RadioGroupItem value="INFLAMAVEL" /></FormControl>
-                          <FormLabel class="font-normal">Inflamáveis</FormLabel>
-                        </FormItem>
-                        <FormItem class="flex items-center space-x-3 space-y-0">
-                          <FormControl><RadioGroupItem value="ELETRICIDADE" /></FormControl>
-                          <FormLabel class="font-normal">Eletricidade</FormLabel>
-                        </FormItem>
-                        <FormItem class="flex items-center space-x-3 space-y-0">
-                          <FormControl><RadioGroupItem value="RADIACAO" /></FormControl>
-                          <FormLabel class="font-normal">Radiação Ionizante ou Substância Radioativa</FormLabel>
-                        </FormItem>
-                      </RadioGroup>
-                    </div>
+                    <RadioGroup v-bind="componentField">
+                      <FormItem class="flex items-center space-x-3 space-y-0">
+                        <FormControl><RadioGroupItem value="INFLAMAVEL" /></FormControl>
+                        <FormLabel class="font-normal">Inflamaveis</FormLabel>
+                      </FormItem>
+                      <FormItem class="flex items-center space-x-3 space-y-0">
+                        <FormControl><RadioGroupItem value="ELETRICIDADE" /></FormControl>
+                        <FormLabel class="font-normal">Eletricidade</FormLabel>
+                      </FormItem>
+                      <FormItem class="flex items-center space-x-3 space-y-0">
+                        <FormControl><RadioGroupItem value="RADIACAO" /></FormControl>
+                        <FormLabel class="font-normal">Radiacao ionizante ou substancia radioativa</FormLabel>
+                      </FormItem>
+                    </RadioGroup>
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               </FormField>
-<!--init SELEÇÃO DOS RISCOS ENVOLVIDOS -->
-                <FormField
+
+              <FormField
                 v-if="Object.keys(riscosDisponiveis).length > 0"
                 name="selecaoRiscos"
                 v-slot="{ value, handleChange }"
-                >
+              >
                 <FormItem>
-                    <FormLabel>Seleção de Riscos (Detalhe)</FormLabel>
-                    <FormDescription>
-                    Selecione os riscos detalhados para o tipo
+                  <FormLabel>Selecao de riscos (detalhe)</FormLabel>
+                  <FormDescription>
+                    Escolha os riscos detalhados para o tipo selecionado:
                     <b>{{ values.tipoRisco }}</b>.
-                    </FormDescription>
+                  </FormDescription>
 
-                    <div class="space-y-3 max-h-60 overflow-y-auto border p-3 rounded-md">
+                  <div class="space-y-3 max-h-60 overflow-y-auto border p-3 rounded-md">
                     <div
-                        v-for="(descricoes, subcat) in riscosDisponiveis"
-                        :key="subcat"
-                        class="space-y-2"
+                      v-for="(descricoes, subcat) in riscosDisponiveis"
+                      :key="subcat"
+                      class="space-y-2"
                     >
-                        <!-- Subcategoria -->
-                        <div
+                      <div
                         class="flex items-center justify-between px-2 py-1 rounded-md transition-colors cursor-pointer"
                         :class="{
-                            'bg-sky-200': descricoes.every((d) => (value || []).includes(d)),
-                            'hover:bg-neutral-50': true
+                          'bg-sky-200': descricoes.every((risk) => (value || []).includes(risk.id)),
+                          'hover:bg-neutral-50': true,
                         }"
-                        @click="toggleSubcategoria(subcat, !(descricoes.every((d) => (value || []).includes(d))), handleChange)"
-                        >
+                        @click="
+                          toggleSubcategoria(
+                            subcat,
+                            !descricoes.every((risk) => (value || []).includes(risk.id)),
+                            handleChange
+                          )
+                        "
+                      >
                         <div class="flex items-center gap-2">
-                            <Check
-                            v-if="descricoes.every((d) => (value || []).includes(d))"
+                          <Check
+                            v-if="descricoes.every((risk) => (value || []).includes(risk.id))"
                             class="h-4 w-4 text-primary"
-                            />
-                            <div v-else-if="descricoes.some((d) => (value || []).includes(d))" class="h-4 w-4 text-primary opacity-60">
+                          />
+                          <div
+                            v-else-if="descricoes.some((risk) => (value || []).includes(risk.id))"
+                            class="h-4 w-4 text-primary opacity-60"
+                          >
                             <Check />
+                          </div>
+                          <div v-else class="h-4 w-4 opacity-0"><Check /></div>
+                          <span class="font-medium">{{ subcat }}</span>
+                        </div>
+                      </div>
+
+                      <div class="pl-6 space-y-1">
+                        <div
+                          v-for="risk in descricoes"
+                          :key="risk.id"
+                          class="flex items-center px-2 py-1 rounded-md transition-colors cursor-pointer hover:bg-neutral-50"
+                          :class="{ 'bg-sky-200': (value || []).includes(risk.id) }"
+                          @click="
+                            toggleDescricao(
+                              risk,
+                              !(value || []).includes(risk.id),
+                              handleChange
+                            )
+                          "
+                        >
+                          <div class="flex items-center w-full">
+                            <div class="w-6 flex justify-start items-center mr-2">
+                              <Check
+                                v-if="(value || []).includes(risk.id)"
+                                class="h-4 w-4 text-primary"
+                              />
+                              <div v-else class="h-4 w-4 opacity-0"></div>
                             </div>
-                            <div v-else class="h-4 w-4 opacity-0"><Check /></div>
-                            <span class="font-medium">{{ subcat }}</span>
+                            <span class="text-sm text-left flex-1">{{ risk.descricao }}</span>
+                          </div>
                         </div>
-                        </div>
+                      </div>
 
-                        <!-- Descrições -->
-                        <div class="pl-6 space-y-1">
-                            <div
-                                v-for="desc in descricoes"
-                                :key="desc"
-                                class="flex items-center px-2 py-1 rounded-md transition-colors cursor-pointer hover:bg-neutral-50"
-                                :class="{'bg-sky-200': (value || []).includes(desc)}"
-                                @click="toggleDescricao(desc, !(value || []).includes(desc), handleChange)"
-                            >
-                                <!-- Use 'flex' para alinhar ícone e texto -->
-                                <div class="flex items-center w-full"> 
-                                    
-                                    <!-- 1. Contêiner do Ícone: Dê uma largura fixa para o ícone (e seu placeholder) e aplique margin à direita -->
-                                    <div class="w-6 flex justify-start items-center mr-2">
-                                        <Check
-                                            v-if="(value || []).includes(desc)"
-                                            class="h-4 w-4 text-primary"
-                                        />
-                                        <!-- O placeholder h-4 w-4 deve ser o mesmo para manter o alinhamento vertical/horizontal -->
-                                        <div v-else class="h-4 w-4 opacity-0"></div> 
-                                    </div>
-                                    
-                                    <!-- 2. Span da Descrição: Use 'flex-1' para que o span ocupe todo o espaço restante e alinhe o texto à esquerda -->
-                                    <span class="text-sm text-left flex-1">{{ desc }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr class="my-2 border-gray-200" />
+                      <hr class="my-2 border-gray-200" />
                     </div>
-                    </div>
+                  </div>
 
-                    <FormMessage />
+                  <FormMessage />
                 </FormItem>
-                </FormField>
-<!--end SELEÇÃO DOS RISCOS ENVOLVIDOS -->
-
+              </FormField>
             </div>
 
             <div class="flex-shrink-0 pt-4">
-              <Button type="submit" class="w-50 bg-[#2082c4] text-white hover:cursor-pointer hover:scale-108">Enviar Requerimento</Button>
+              <Button
+                type="submit"
+                class="w-50 bg-[#2082c4] text-white hover:cursor-pointer hover:scale-105"
+              >
+                Enviar Requerimento
+              </Button>
             </div>
           </section>
         </div>
