@@ -4,7 +4,8 @@ import { format } from 'date-fns'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CalendarIcon } from 'lucide-vue-next'
-import { DateValue, getLocalTimeZone, parseDate, toDate } from '@internationalized/date'
+import type { DateValue } from '@internationalized/date'
+import { getLocalTimeZone, parseDate } from '@internationalized/date'
 
 const INPUT_FORMAT = 'yyyy-MM-dd'
 const TIME_ZONE = getLocalTimeZone()
@@ -17,16 +18,17 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: Date | undefined): void
 }>()
 
-const calendarValue = ref<DateValue | undefined>(
-  props.modelValue ? parseDate(format(props.modelValue, INPUT_FORMAT)) : undefined
-)
+const calendarValue = ref<DateValue | undefined>()
+if (props.modelValue) {
+  calendarValue.value = parseDate(format(props.modelValue, INPUT_FORMAT)) as DateValue
+}
 const inputValue = ref(props.modelValue ? format(props.modelValue, INPUT_FORMAT) : '')
 
 function syncFromDate(value: Date | null | undefined) {
   if (value && !Number.isNaN(value.getTime())) {
     const formatted = format(value, INPUT_FORMAT)
     inputValue.value = formatted
-    calendarValue.value = parseDate(formatted)
+    calendarValue.value = parseDate(formatted) as DateValue
   } else {
     inputValue.value = ''
     calendarValue.value = undefined
@@ -44,7 +46,7 @@ function handleSelect(value: DateValue | undefined) {
   calendarValue.value = value
 
   if (value) {
-    const selected = toDate(value, TIME_ZONE)
+    const selected = value.toDate(TIME_ZONE)
     inputValue.value = format(selected, INPUT_FORMAT)
     emit('update:modelValue', selected)
   } else {
@@ -65,7 +67,7 @@ function handleInput(event: Event) {
 
   const parsed = new Date(`${value}T00:00:00`)
   if (!Number.isNaN(parsed.getTime())) {
-    calendarValue.value = parseDate(value)
+    calendarValue.value = parseDate(value) as DateValue
     emit('update:modelValue', parsed)
   } else {
     calendarValue.value = undefined

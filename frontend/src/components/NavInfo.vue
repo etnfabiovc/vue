@@ -19,7 +19,7 @@ defineProps<{
 
 <template>
   <SidebarGroup class="group-data-[collapsible=icon]:block">
-    <SidebarGroupLabel>Administracao</SidebarGroupLabel>
+    <SidebarGroupLabel>Informacoes</SidebarGroupLabel>
     <SidebarMenu>
       <SidebarMenuItem v-for="item in info" :key="item.name">
         <SidebarMenuButton as-child>

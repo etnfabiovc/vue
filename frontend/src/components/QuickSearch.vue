@@ -65,10 +65,11 @@ const onSelect = (route: string) => {
         <CommandList>
           <CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
 
-          <CommandGroup heading="Navegação">
+          <CommandGroup heading="Navegacao">
             <CommandItem
               v-for="cmd in commands"
               :key="cmd.route"
+              :value="cmd.route"
               @select="onSelect(cmd.route)"
               class="hover:cursor-pointer hover:bg-neutral-200"
             >
@@ -79,11 +80,12 @@ const onSelect = (route: string) => {
           <CommandSeparator />
 
           <CommandGroup heading="Outros">
-            <CommandItem 
-            @select="onSelect('/profile')"
-            class="hover:cursor-pointer hover:bg-neutral-200"
+            <CommandItem
+              value="profile"
+              @select="onSelect('/profile')"
+              class="hover:cursor-pointer hover:bg-neutral-200"
             >
-            Perfil
+              Perfil
             </CommandItem>
           </CommandGroup>
         </CommandList>

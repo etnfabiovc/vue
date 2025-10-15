@@ -1,14 +1,7 @@
 <script setup lang="ts">
-
-  import AppSidebar from "@/components/AppSidebar.vue"
-  import AppHeader from "@/components/AppHeader.vue"
-  import {
-    SidebarProvider,
-    SidebarInset,
-  } from "@/components/ui/sidebar"
-
-  import backgroundImage from "@/assets/images/cnaaa.jpeg"
-
+import AppSidebar from "@/components/AppSidebar.vue"
+import AppHeader from "@/components/AppHeader.vue"
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 </script>
 
 <template>
@@ -17,14 +10,14 @@
       <!-- Sidebar -->
       <AppSidebar />
 
-      <!-- Área principal -->
+      <!-- Area principal -->
       <SidebarInset
         class="flex flex-col flex-1 h-screen w-full bg-background overflow-hidden"
       >
         <!-- Header fixo -->
         <AppHeader />
 
-        <!-- Conteúdo sem rolagem -->
+        <!-- Conteudo sem rolagem -->
         <main class="flex-1 p-4 overflow-hidden h-full w-full bg-[linear-gradient(rgba(255,255,255,0.7),rgba(255,255,255,0.7)),url('/src/assets/images/cnaaa.jpeg')] bg-cover bg-center">
           <RouterView />
         </main>
