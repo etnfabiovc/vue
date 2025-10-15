@@ -1,0 +1,100 @@
+/* =====================================
+   SHADCN-VUE / REKA-UI OVERRIDES
+   ===================================== */
+
+/* --- Gatilho principal do Select (botão) --- */
+button[data-slot="form-control"][role="combobox"] {
+  background-color: #ffffff !important;
+  width: 100% !important;
+  border-radius: 0.375rem !important; /* rounded-md */
+  border: 1px solid hsl(var(--accent)) !important; /* cor de destaque */
+  color: hsl(var(--foreground)) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+/* --- Hover do gatilho --- */
+button[data-slot="form-control"][role="combobox"]:hover {
+  background-color: #f8f8f8 !important;
+  border-color: hsl(var(--accent)) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* --- Conteúdo da lista (dropdown) --- */
+[data-slot="select-content"],
+[data-radix-vue-select-content],
+[data-reka-popper-content-wrapper] {
+  background-color: #ffffff !important;
+  border-radius: 0.375rem !important;
+  border: 1px solid hsl(var(--accent)) !important; /* borda colorida */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+  overflow: hidden !important;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+/* --- Itens clicáveis da lista --- */
+[data-slot="select-item"],
+[data-reka-collection-item],
+[data-radix-vue-select-item],
+div[role="option"][data-slot="select-item"] {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  user-select: none !important;
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+  padding: 6px 10px !important;
+  border-radius: 0.25rem !important;
+}
+
+/* --- Hover nos itens --- */
+[data-slot="select-item"]:hover,
+[data-reka-collection-item]:hover,
+[data-radix-vue-select-item]:hover,
+div[role="option"][data-slot="select-item"]:hover {
+  background-color: hsl(var(--accent) / 0.12) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+/* --- Item selecionado --- */
+[data-slot="select-item"][data-state="checked"],
+[data-reka-collection-item][data-state="checked"],
+[data-radix-vue-select-item][data-state="checked"],
+div[role="option"][data-slot="select-item"][data-state="checked"] {
+  background-color: hsl(var(--accent) / 0.22) !important;
+  font-weight: 500 !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+/* --- Dark mode --- */
+.dark button[data-slot="form-control"][role="combobox"] {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--accent)) !important;
+}
+
+.dark button[data-slot="form-control"][role="combobox"]:hover {
+  background-color: hsl(var(--muted)) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* --- Itens no dark mode --- */
+.dark [data-slot="select-item"]:hover,
+.dark [data-reka-collection-item]:hover,
+.dark [data-radix-vue-select-item]:hover,
+.dark div[role="option"][data-slot="select-item"]:hover {
+  background-color: hsl(var(--accent) / 0.3) !important;
+}
+
+.dark [data-slot="select-item"][data-state="checked"],
+.dark [data-reka-collection-item][data-state="checked"],
+.dark [data-radix-vue-select-item][data-state="checked"],
+.dark div[role="option"][data-slot="select-item"][data-state="checked"] {
+  background-color: hsl(var(--accent) / 0.4) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+/* --- Seções do formulário (cards) --- */
+section {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease-in-out;
+}
